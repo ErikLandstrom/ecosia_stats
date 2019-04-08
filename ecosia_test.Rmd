@@ -64,8 +64,11 @@ It's definetly not perfect, and since there is only one financial report from
 jan_2019_grey <- image_quantize(image_read("images/2019_Jan.jpg"), colorspace = "gray")
 jan_2019_grey
 
-jan_2019_text <- cat(image_ocr(jan_2019_grey))
-jan_2019_text
+cat(image_ocr(jan_2019_grey))
+```
+
+```{r text_jan, eval = FALSE}
+cat(image_ocr(jan_2019_grey), file = "text_files/Jan_2019_text.txt")
 ```
 
 Grey scale is definetly better than color for _OCR_.
@@ -85,10 +88,36 @@ cat(image_ocr(image_quantize(jan_2019_neg, colorspace = "gray")))
 
 Without doubt, __gray scale__ is the best for _OCR_.
 
-## 1.1 Web scraping
+## 1.1 Extract data from text
+
+```{r}
+text <- read_lines(image_ocr(jan_2019_grey))
+text
+
+text_jan <- text[str_detect(text, "[0-9]|Burkina Faso|Madagascar")]
+text_jan
+
+
+text_jan <- str_replace(text_jan, "€|¢", "")
+text_jan <- text_jan[c(1, 3, 6, 7:16, 18:length(text_jan))]
+text_jan
+
+
+```
+
+
+
+
+
+## 1.2 Web scraping
 
 Since there is some data available at the respective blog post as well, web 
 scraping is also an alternative to get additional data.
+
+
+
+
+
 
 # 2. December 2018
 
