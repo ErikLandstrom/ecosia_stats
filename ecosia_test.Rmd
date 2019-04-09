@@ -176,7 +176,278 @@ dec_2018_table %>%
 
 ```
 
+# 3. Download all files from a repository
 
 ```{r}
+startDate <- as.Date("2012-01-01")
+month_vec <- seq(startDate, by = "1 month", length.out = 12)
+month_vec <- months(month_vec) %>% tolower()
+month_vec
 ```
+
+
+All reports from 2017 and 2018 are in the repository `2019/02`. All filenames 
+except Jan 2017 end with _EN_.
+
+```{r, eval = FALSE}
+url <- "https://blog.ecosia.org/content/images/2019/02/"
+
+image_file <- "ecosia-financial-report-january-2018-EN.jpg"
+
+# Generate list of url paths to images
+urls <- as_vector(1:12)
+for(i in 1:length(urls)) {
+  urls[i] <- paste(url, "ecosia-financial-report-", month_vec[i], "-2018", "-EN.jpg", sep = "")
+}
+
+urls
+
+for(i in 1:length(urls)) {
+  download.file(urls[i],
+                destfile = paste("images/2018/", str_extract(month_vec[i], "[a-z]{3}"), "_2018.jpg", sep = ""),
+                mode = "wb")
+}
+
+for(i in 10:length(urls)) {
+  download.file(urls[i],
+                destfile = paste("images/2018/", str_extract(month_vec[i], "[a-z]{3}"), "_2018.jpg", sep = ""),
+                mode = "wb")
+}
+
+
+create_urls_for_ecosia_reports <- function(url, month, year) {
+  urls <- as_vector(1:12)
+  for(i in 1:length(urls)) {
+  urls[i] <- paste(url, month[i], "-", year, "-EN.jpg", sep = "")
+  }
+  
+  return(urls)
+}
+
+# For Sep and Nov the syntax was changed with an added "s"
+urls <- create_urls_for_ecosia_reports("https://blog.ecosia.org/content/images/2019/02/ecosia-financial-reports-",
+                               month_vec, 2018)
+
+download_ecosia_reports <- function(urls, dest_file = "images/", year, month) {
+  for(i in 1:length(urls)) {
+  download.file(urls[i],
+                destfile = paste("images/2018/", str_extract(month[i], "[a-z]{3}"), "_", year, ".jpg", sep = ""),
+                mode = "wb")
+    }
+}
+
+download_ecosia_reports(urls[c(9, 11)], "images/2018/", 2018, month = month_vec[c(9, 11)])
+```
+
+I used the image I already downloaded for 2018 Dec, since the syntax was 
+completely different.
+
+## 3.1 _OCR_ on 2018 reports
+
+Going back to _OCR_. First, I'm going to try and extract as much data as 
+possible from the December 2018 report.
+
+```{r}
+dec_2018 <- image_read("images/2018/dec_2018.jpg")
+
+dec_2018_grey <- image_quantize(dec_2018, colorspace = "gray")
+
+dec_2018_grey_ocr <- image_ocr(dec_2018_grey)
+cat(dec_2018_grey_ocr)
+```
+
+I get most of the data, but I will try and use it on negative gray scale as well.
+
+```{r}
+dec_2018_neg <- image_negate(dec_2018)
+
+dec_2018_neg_grey <- image_quantize(dec_2018_neg, colorspace = "gray")
+
+dec_2018_neg_grey_ocr <- image_ocr(dec_2018_neg_grey)
+cat(dec_2018_neg_grey_ocr)
+```
+
+I only get the operating cost that I didn't get before, I will skip the 
+individual investments in different countries for this format.
+
+```{r}
+dec_2018_large <- image_scale(dec_2018, "2000")
+dec_2018_large
+
+dec_2018_large_grey_ocr <- image_ocr(image_quantize(dec_2018_large, colorspace = "gray"))
+cat(dec_2018_large_grey_ocr)
+
+dec_2018_large_grey_neg_ocr <- image_ocr(image_negate(image_quantize(dec_2018_large, colorspace = "gray")))
+cat(dec_2018_large_grey_neg_ocr)
+
+dec_2018_large_neg_grey_ocr <- image_ocr(image_quantize(image_negate(dec_2018_large), colorspace = "gray"))
+cat(dec_2018_large_neg_grey_ocr)
+```
+
+```{r}
+
+tibble(year = 2018, 
+       month = str_extract(dec_2018_large_grey_ocr, "Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec"),
+       income = str_replace(str_extract(dec_2018_large_grey_ocr, "was €[0-9],[0-9]+,[0-9]+"), "was \200", "") %>% 
+         str_replace_all(",", "") %>% as.numeric(),
+       invest_tot = str_extract(dec_2018_large_grey_ocr, "Tree Planting .[0-9]+,[0-9]+") %>% 
+         str_replace("Tree Planting \200", "") %>% 
+         str_replace(",", ""),
+       invest_tree = str_extract(dec_2018_large_grey_ocr, "[0-9]+,[0-9]{3} directly") %>% 
+         str_replace(",", "") %>% 
+         str_replace("\\D+", ""),
+       invest_saved = str_extract(dec_2018_large_grey_ocr, "parked .+[0-9]+,[0-9]{3} in") %>% 
+         str_replace(",", "") %>% 
+         str_replace_all("\\D+", ""),
+       reserves = str_extract(dec_2018_large_grey_ocr, "Reserves.+[0-9]{3},[0-9]{3}") %>% 
+         str_replace(",", "") %>% 
+         str_replace("\\D+", ""),
+       ads = str_extract(dec_2018_large_neg_grey_ocr, "Spreading the Word.+[0-9]+,[0-9]{3}") %>% 
+         str_replace(",", "") %>% 
+         str_replace("\\D+", ""),
+       costs = str_extract(dec_2018_large_neg_grey_ocr, "Operating Costs.+[0-9]{3},[0-9]{3}") %>% 
+         str_replace(",", "") %>% 
+         str_replace("\\D+", ""),
+       salaries = str_extract(dec_2018_large_grey_ocr, "Salaries.+[0-9]+,[0-9]{3}") %>% 
+         str_replace(",", "") %>% 
+         str_replace("\\D+", ""),
+       social = str_extract(dec_2018_large_grey_ocr, "Employment.+[0-9]+,[0-9]{3}") %>% 
+         str_replace(",", "") %>% 
+         str_replace("\\D+", ""),
+       taxes = str_extract(dec_2018_large_grey_ocr, "Tax.+[0-9]+,[0-9]{3}") %>% 
+         str_replace(",", "") %>% 
+         str_replace("\\D+", ""),
+       server = str_extract(dec_2018_large_grey_ocr, "Server.+[0-9]+,[0-9]{3}") %>% 
+         str_replace(",", "") %>% 
+         str_replace("\\D+", ""),
+       office = str_extract(dec_2018_large_grey_ocr, "Office.+[0-9]+,[0-9]{3}") %>% 
+         str_replace(",", "") %>% 
+         str_replace("\\D+", ""),
+       other = str_extract(dec_2018_large_grey_ocr, "Other.+[0-9]+,[0-9]{3}") %>% 
+         str_replace(",", "") %>% 
+         str_replace("\\D+", ""),
+       utilities = str_extract(dec_2018_large_grey_ocr, "utilities.+[0-9]+,[0-9]{3}") %>% 
+         str_replace(",", "") %>% 
+         str_replace("\\D+", ""),
+       travel = str_extract(dec_2018_large_grey_ocr, "Travel.+[0-9]+,[0-9]{3}") %>% 
+         str_replace(",", "") %>% 
+         str_replace("\\D+", ""),
+       CO2_offset = str_extract(dec_2018_large_grey_ocr, "offset.+[0-9]+,[0-9]{3}") %>% 
+         str_replace(",", "") %>% 
+         str_replace("\\D+", ""),
+       employees = str_extract(dec_2018_large_grey_ocr, "[0-9]+ people") %>% 
+         str_replace("\\D+", ""),
+       trees = str_extract(dec_2018_large_grey_ocr, "planting of [0-9]+,[0-9]+,[0-9]+") %>% 
+         str_replace_all(",", "") %>% 
+         str_replace("\\D+", "")
+       )
+```
+
+```{r}
+extract_ecosia_data_per_year_3 <- function(folder, year, month = month_vec) {
+  data <- tibble(year = 0, 
+       month = 0,
+       income = 0,
+       invest_tot = 0,
+       invest_tree = 0,
+       invest_saved = 0,
+       reserves = 0,
+       ads = 0,
+       costs = 0,
+       salaries = 0,
+       social = 0,
+       taxes = 0,
+       server = 0,
+       office = 0,
+       other = 0,
+       utilities = 0,
+       travel = 0,
+       CO2_offset = 0,
+       employees = 0,
+       trees = 0
+       )
+  
+  for(i in seq_along(month)) {
+    img <- image_scale(image_read(paste(folder, str_extract(month[i], "[a-z]{3}"), "_", as.character(year), ".jpg", sep = "")), 2000)
+  
+    img_grey_ocr <- image_ocr(image_quantize(img, colorspace = "gray"))
+    
+    img_neg_grey_ocr <- image_ocr(image_negate(image_quantize(img, colorspace = "gray")))
+    
+    temp <- c(year, 
+       str_extract(img_grey_ocr, "Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec"),
+       str_replace(str_extract(img_grey_ocr, "(was €[0-9],[0-9]+,[0-9]+)|(was .[0-9]+,[0-9]+)"), "was \200", "") %>% 
+         str_replace_all(",", "") %>% as.numeric(),
+       str_extract(img_grey_ocr, "ree Planting .[0-9]+,[0-9]+") %>% 
+         str_replace("ree Planting \200", "") %>% 
+         str_replace(",", "") %>% as.numeric(),
+       str_extract(img_grey_ocr, "[0-9]+,[0-9]{3} directly") %>% 
+         str_replace(",", "") %>% 
+         str_replace("\\D+", "") %>% as.numeric(),
+       str_extract(img_grey_ocr, "(parked .+[0-9]+,[0-9]{3} in)|(parked .+[0-9] in)") %>% 
+         str_replace(",", "") %>% 
+         str_replace_all("\\D+", "") %>% as.numeric(),
+       str_extract(img_grey_ocr, "(Reserves.+[0-9]{3},[0-9]{3})|Reserves. .[0-9]+,[0-9]+") %>% 
+         str_replace(",", "") %>% 
+         str_replace("\\D+", "") %>% as.numeric(),
+       str_extract(img_neg_grey_ocr, "Spreading the Word.+[0-9]+,[0-9]{3}") %>% 
+         str_replace(",", "") %>% 
+         str_replace("\\D+", ""),
+       str_extract(img_neg_grey_ocr, "Operating Costs.+[0-9]{3},[0-9]{3}") %>% 
+         str_replace(",", "") %>% 
+         str_replace("\\D+", "") %>% as.numeric(),
+       str_extract(img_grey_ocr, "Salaries.+[0-9]+,[0-9]{3}") %>% 
+         str_replace(",", "") %>% 
+         str_replace("\\D+", "") %>% as.numeric(),
+       str_extract(img_grey_ocr, "Employment.+[0-9]+,[0-9]{3}") %>% 
+         str_replace(",", "") %>% 
+         str_replace("\\D+", "") %>% as.numeric(),
+       str_extract(img_grey_ocr, "Tax.+[0-9]+,[0-9]{3}") %>% 
+         str_replace(",", "") %>% 
+         str_replace("\\D+", "") %>% as.numeric(),
+       str_extract(img_grey_ocr, "Server.+[0-9]+,[0-9]{3}") %>% 
+         str_replace(",", "") %>% 
+         str_replace("\\D+", "") %>% as.numeric(),
+       str_extract(img_grey_ocr, "Office.+[0-9]+,[0-9]{3}") %>% 
+         str_replace(",", "") %>% 
+         str_replace("\\D+", "") %>% as.numeric(),
+       str_extract(img_grey_ocr, "Other.+[0-9]+,[0-9]{3}") %>% 
+         str_replace(",", "") %>% 
+         str_replace("\\D+", "") %>% as.numeric(),
+       str_extract(img_grey_ocr, "utilities.+[0-9]+,[0-9]{3}") %>% 
+         str_replace(",", "") %>% 
+         str_replace("\\D+", "") %>% as.numeric(),
+       str_extract(img_grey_ocr, "Travel.+[0-9]+,[0-9]{3}") %>% 
+         str_replace(",", "") %>% 
+         str_replace("\\D+", "") %>% as.numeric(),
+       str_extract(img_grey_ocr, "offset.+[0-9]+,[0-9]{3}") %>% 
+         str_replace(",", "") %>% 
+         str_replace("\\D+", "") %>% as.numeric(),
+       str_extract(img_grey_ocr, "[0-9]+ people") %>% 
+         str_replace("\\D+", "") %>% as.numeric(),
+       str_extract(img_grey_ocr, "planting of [0-9]+,[0-9]+,[0-9]+") %>% 
+         str_replace_all(",", "") %>% 
+         str_replace("\\D+", "") %>% as.numeric()
+       )
+    
+    data[i, ] <- temp
+    }
+  
+  return(data)
+}
+```
+
+```{r}
+ecosia_2018_reports <- extract_ecosia_data_per_year_3("images/2018/", 2018, month_vec)
+```
+
+In general it works well, I get the most important information except for 
+reserves. That I will investigate later.
+
+Save this output.
+
+```{r eval = FALSE}
+write_tsv(ecosia_2018_reports, "ecosia_2018_reports_data.txt")
+```
+
 
