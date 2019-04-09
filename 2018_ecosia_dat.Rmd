@@ -2,7 +2,9 @@
 title: "Ecosia reports 2018"
 author: "Erik Ländström"
 date: "9 April 2019"
-output: html_document
+output: 
+  html_document: 
+    keep_md: yes
 ---
 
 ```{r setup, include=FALSE}
