@@ -1,0 +1,54 @@
+---
+title: "Ecosia reports 2018"
+author: "Erik Ländström"
+date: "9 April 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This document is for playing around with the data I extracted from the 2018 
+ecosia reports. I'm missing data for reserves right now, but I will revisit that
+in the future (or I can probably calculate it from the other data).
+
+```{r}
+library(tidyverse)
+```
+
+First, read data.
+
+```{r}
+raw_data <- read_tsv("ecosia_2018_reports_data.txt")
+
+raw_data 
+```
+
+1. The data in `invest_saved` can be negative, but it didn't get extracted.
+
+2. `reserves` were not extracted for all months, but since I have all other major
+data I should be able to calculate it.
+
+3. I'm missing operation costs for February, so I will just add that.
+
+```{r}
+# 3 
+raw_data[2, 9] <- 208797
+
+data <- raw_data %>% 
+  mutate(invest_saved = if_else(invest_tot - invest_tree < 0, -invest_saved, invest_saved), # 1
+         reserves     = income - invest_tot - ads - costs) # 2
+
+data
+```
+
+Calculate totals for 2018.
+
+```{r}
+data_2018 <- data %>% 
+  select(year, income:costs, trees) %>% 
+  group_by(year) %>% 
+  summarise_all(sum)
+```
+
