@@ -54,3 +54,22 @@ data_2018 <- data %>%
   summarise_all(sum)
 ```
 
+Ecosia's income for 2018 were `r data_2018$income` euros, of which they invested
+`r data_2018$invest_tot` directly into tree planting in the world. This resulted
+in `r data_2018$trees` being planted!
+
+This is not exactly the 30 million trees that they claimed to have planted in
+2018, but I'm not exactly sure how they calculate this number.
+
+# Plotting time!
+
+```{r}
+data %>% 
+  select(year:costs) %>% 
+  group_by(year, month) %>% 
+  gather(income:costs, key = "category", value = "money") %>% 
+  ggplot(aes(month, money, color = category)) +
+  geom_line(aes(group = category))
+```
+
+
